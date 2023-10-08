@@ -1,0 +1,50 @@
+name: "EDK2 FirmwareCI Tests"
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - '**/*.bat'
+      - '**/*.md'
+      - '**/*.py'
+      - '**/*.rst'
+      - '**/*.sh'
+      - '**/*.txt'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      binaryArtifact: ${{ env.artifact }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: python3 software-properties-common apt-utils cryptsetup apt-transport-https sudo wget build-essential uuid-dev git lcov nasm acpica-tools virtualenv device-tree-compiler mono-devel python3-pip python3-venv locales gnupg ca-certificates
+      - name: Source edksetup
+        run: source edksetup.sh
+      - name: Build Base Tools
+        run: make -C BaseTools
+      - name: Build OVMF Package
+        run: source edksetup.sh && build -p OvmfPkg/OvmfPkgX64.dsc -b DEBUG -a X64 -t GCC5
+      - name: Upload Artifact to FirmwareCI
+        uses: docker://firmwareci/uploader:v1.1
+        with:
+          EMAIL: "firmwareci@gmail.com"
+          PASSWORD: ${{ secrets.PASSWORD }}
+
+          PROJECT_TOKEN: 01HC8EGCFQ9MTHCE6BAB10K9YX
+          COMMIT_HASH: ${{ github.sha }}
+
+          BINARY_PATH: /home/runner/work/edk2/edk2/Build/OvmfX64/DEBUG_GCC5/FV/OVMF.fd
+
+          PROTOCOL: local
+          API: https://api.firmwareci.9esec.dev:8443
